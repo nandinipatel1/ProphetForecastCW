@@ -1,0 +1,216 @@
+---
+title: "Meta Prophet System"
+subtitle: "Coursework 1 for MTH6139 Time Series Module"
+author:
+- name: Nandini Sanjaykumar Patel # replace this by your name
+date: "11th March 2024"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r, echo=FALSE}
+htmltools::img(src = knitr::image_uri("QMlogo.png"), 
+               alt = 'logo', 
+               style = 'position:absolute; top:0; right:0; padding:10px; width:30%;')
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+We will be creating a 5-year forecast of Annual Global Emissions of Carbon Dioxide by using the data set `Annual Global Emissions of Carbon Dioxide from 1940 to 2023` and the Meta Prophet Forecasting System. The Prophet System is a tool used for time series forecasting and will handle various components of the time series data, such as trend, seasonality, etc.
+
+Source of data set : Global Carbon Project; Expert(s) (Friedlingstein et al. (2023)).
+
+The data is also is linked in here :
+<https://www.statista.com/statistics/276629/global-co2-emissions/>
+
+## 1. Coding the Dataset  <a id="section-1"></a>
+### Using Meta's Prophet forecasting system.
+We will apply the 'prophet' package within R to forecast our time series. To use it, we will install the package and open the functionality from this library later on.
+
+After installation, with our data, we will now create a `data frame`, making our `Year` column as `ds` and `Emissions In Billion Metric Tons` as `y`. 
+
+To ensure that the date formats of the `ds` column are recognised at years (YYYY), we will convert the column into character strings and then into our preferred date format. To confirm our data that we imported has successfully become a dataframe, `class()` function has been used.
+
+```{r}
+library(readxl)
+Annual_global_emissions_of_carbon_dioxide_1940_2023 <- read_excel("Annual-global-emissions-of-carbon-dioxide-1940-2023.xlsx")
+GlobalCo2.df <- data.frame(ds=Annual_global_emissions_of_carbon_dioxide_1940_2023$Year,y=Annual_global_emissions_of_carbon_dioxide_1940_2023$`Emissions In Billion Metric Tons`)
+GlobalCo2.df$ds <- as.Date(as.character(GlobalCo2.df$ds), format = "%Y")
+class(GlobalCo2.df)
+```
+
+Then, we will convert the `data frame` into a `time series` object. Again, for confirmation that the conversion has been successful, `class()` function has been used. 
+
+```{r}
+GlobalCo2_ts <- ts(GlobalCo2.df$y, start = min(GlobalCo2.df$ds), frequency = 1)
+GlobalCo2_ts
+```
+
+As discussed initially, we will now introduce the `prophet` package here to plot a forecast of Global Emissions of Carbon Dioxide with a projection of 5 years. 
+
+To plot this, we will make a future data frame to create future dates for the next 5 years to make a forecast which will then be plotted within the graph.
+
+```{r}
+library(prophet)
+```
+
+When using the `prophet` function, it detects yearly seasonality but disables weekly and daily seasonality as the function did not detect this type of seasonality within our dataset.
+
+```{r}
+m <- prophet(GlobalCo2.df)
+FutureDatesforNext5Years = prophet::make_future_dataframe(m, periods = 5, freq = "year")
+ForecastForNext5Years = predict(m,FutureDatesforNext5Years)
+plot(m, ForecastForNext5Years)
+```
+
+Here is the plot of the 5-year forecast of `Annual Global Carbon Dioxide Emissions` as an interactive graph using `DyGraphs`.
+
+```{r}
+dyplot.prophet(m, ForecastForNext5Years)
+```
+
+From our plotted 5-year forecast, it can be observed that the global emissions of Carbon Dioxide will continue to increase year-by-year, estimating Global Emissions of Carbon Dioxide will total to 41.51 Billion Metric Tons in 2028. 
+
+## 2. Analysis  <a id="section-1"></a>
+
+#### Trend and Seasonality :
+
+```{r}
+library(prophet)
+prophet_plot_components(m, ForecastForNext5Years)
+```
+
+When observing our trend component, it shows us the direction and sized of change in carbon dioxide emissions over the years. The component appears as a mostly straight and positive linear line, indicating a consistent upward trajectory in global carbon dioxide emissions over the next 5 years. This means there is and will continue to be a persistent increase in Global Carbon Dioxide Emissions. 
+
+However, when observing the yearly seasonality graph, it shows us the fluctuations observed in the data over a year. The first 5 months shows huge fluctuations as it initially slightly increases then spikes downwards to -5, before largely spiking upwards and downwards again, indicating there is high level of seasonality for these months. In the next 7 months, the fluctuations start to stabilise and are of the roughly of the same magnitude. 
+
+#### Linear Regression : 
+
+We will carry out linear regression model of 'Emissions' on 'Years' to see the growth of our series. 
+
+```{r}
+model=lm(y~ds, GlobalCo2.df)
+summary(model)
+```
+
+From the summary of the linear regression model, we can see that the adjusted R-squared is 0.9849, which indicates the data has a great level of goodness of fit as the model explains 98.49% of the variance of global carbon dioxide emissions. This is because the adjusted R-squared value is close to 1. 
+
+The Multiple R-squared tells us the proportion of variance in the Emissions variable that is explained by Years Variable. The Multiple R-Squared value is 0.9851, meaning it is close to a perfect fit as it is close to the value of 1. 
+
+The p-value of <2.2e-16, which is considered low, shows the model is statistically significant and that there is a strong linear relationship between the years and carbon dioxide emissions. 
+
+The estimate ds value of 1.176e-03 represents beta 1 in the linear trend function and estimates that per year, the Global Emissions of CO2 increases by 1.17 Billion Metric Tons.
+
+
+We will now plot `Emissions` vs `Year` and apply an estimated regression line on this graph. 
+```{r}
+plot(GlobalCo2.df$ds,GlobalCo2.df$y, type="p", xlab ="Year", ylab="Emissions (in Billion Metric Tons)")
+points(GlobalCo2.df$ds,fitted(model), type ="l", col="blue")
+```
+
+When observing the graph above, it is observed that the Global Emissions of Carbon Dioxide follows a positive linear pattern as it steadily escalates over the course of years. There are some notable small dips in the data during 1945, 1980s, 2008 and 2020. This is due to global events, such as WW2, recessions and COVID-19 Outbreak (due to lockdowns and restrictions). The largest annual reduction was the end of WW2 in 1945, when emissions of CO2 decreased by 17%.
+
+Additionally, we will plot the fitted values against the standardized residuals to assess model assumptions.
+
+```{r}
+plot(fitted(model), rstandard(model), xlab="Fitted Values", ylab = "Standardized Residuals", main = "Residuals vs Fitted", type = "l")
+abline(a=0, b=0)
+```
+
+
+When observing the Residuals vs Fitted graph above, there is an initial sharp decrease with slight fluctuations in the relationship between the residuals and fitted values and then there is a heavy fluctuation that is followed after this, with another noticable sharp decrease in the relationship again later on. 
+
+## 3. Additional Analysis using another data set  <a id="section-1"></a>
+
+We can also look at creating a 5-year forecast of the `CO2` data set that is found with in R by typing CO2. 
+The `CO2` data set shows the results of an experiment on cold tolerance of grass. Results measure atmospheric concentrations of CO2 in parts per million collected monthly from 1959 to 1997. 
+
+Source : Keeling, C. D. and Whorf, T. P., Scripps Institution of Oceanography (SIO), University of California, La Jolla, California USA 92093-0220.
+
+We can apply our methods above and the Prophet Forecasting System to the `CO2` data set to plot a 5-year forecast and carry out an analysis.
+```{r}
+co2.df = data.frame(
+  ds=zoo::as.yearmon(time(co2)), 
+  y=co2)
+m2 <- prophet::prophet(co2.df)
+FutureDatesfor5Yrs = prophet::make_future_dataframe(m2, periods=20, freq="quarter")
+Prediction = predict(m2, FutureDatesfor5Yrs)
+plot(m2, Prediction)
+```
+
+#### Interactive Graph 
+
+```{r}
+dyplot.prophet(m2, Prediction)
+```            
+From this plotted 5-year forecast, it can be observed that the atmospheric concentrations of Carbon Dioxide will have a positive linear relationship with constant fluctuations and will continue to increase monthly over the period, estimating the atmospheric concentrations of Carbon Dioxide being 370.38 parts per million in 2002. The data follows the same trajectory as the `Annual Global Emissions of Carbon Dioxide` forecast plot. However, one difference is that the data in `Annual Global Emissions of Carbon Dioxide` data set is measured in years where as in the `CO2` data, it is measured in months. Therefore, there are many more data points in the `CO2` forecast plot. Another difference is that the data sets are measured in different units.  
+
+#### Trend and seasonality            
+
+```{r}
+library(prophet)
+prophet_plot_components(m2, Prediction)
+```
+
+When observing our trend component, it shows us the direction and sized of change in atmospheric concentrations of carbon dioxide over the years. The component appears as a mostly straight and positive linear line, indicating a consistent upward trajectory in atmospheric concentrations of carbon dioxide over the next 5 years up to 2002. This means there is and will continue to be a persistent increase in atmospheric concentrations of carbon dioxide. The trend component for `CO2` data is similar to the trend component of the `Annual Global Emissions of Carbon Dioxide` data. 
+
+However, when observing the yearly seasonality graph, it shows us the fluctuations observed in the data over a year. The seasonality initially dips slightly and then increases in fluctuations until the May. After this, the seasonality decreases gradually until it reaches -5 just before October. After October, it increases again to 0 but in slight fluctuations. Therefore, the seasonality component for `CO2` data is different to the seasonality component of the `Annual Global Emissions of Carbon Dioxide` data.
+
+#### Linear Regression             
+
+We will carry out linear regression of 'CO2 concentrations' on 'Time' to see the growth of our series. 
+
+```{r}
+model2=lm(y~ds, co2.df)
+summary(model2)
+```
+
+From the summary of the linear regression model, we can see that the adjusted R-squared is 0.9694, which indicates the data has a great level of goodness of fit as the model explains 96.94% of the variance of atmospheric concentrations of carbon dioxide, which is lower than the `Annual Global Emissions of CO2` data.
+
+The Multiple R-squared tells us the proportion of variance in the Concentrations variable that is explained by Time Variable. The Multiple R-Squared value is 0.9695, meaning it is close to a perfect fit as it is close to the value of 1, but is, again, lower than the `Annual Global Emissions of CO2` data.
+
+The p-value of <2.2e-16, which is considered low, shows the model is statistically significant and that there is a strong linear relationship between the time and atmospheric concentrations of carbon dioxide. This was the same for the `Annual Global Emissions of CO2` data.
+
+The estimate ds value of 1.308e+00 represents beta 1 in the linear trend function and shows that per month, the Atmospheric Concentrations of Carbon Dioxide increases by 1.308 parts per million. 
+
+
+We will now plot `CO2 Concentrations` vs `Time` and apply an estimated regression line on this graph. 
+```{r}
+plot(co2.df$ds,co2.df$y, type="p", xlab ="Year", ylab="CO2 Concentrations in Parts per Million")
+points(co2.df$ds,fitted(model2), type ="l", col="blue")
+```
+
+When observing the graph above, it is observed that the Atmospheric Concentrations of Carbon Dioxide follows a positive linear pattern as it steadily escalates over the course of years. This is similar when compared to `Annual Global Emissions of Carbon Dioxide` data. However, there are many more data points considered in the graph above as the `CO2` data is in months, whereas the Annual Global Emissions of Carbon Dioxide is in years. 
+
+Additionally, we will plot the fitted values against the standardized residuals.
+
+```{r}
+plot(fitted(model2), rstandard(model2), xlab="Fitted Values", ylab = "Standardized Residuals", main = "Residuals vs Fitted", type = "l")
+abline(a=0, b=0)
+```
+
+When observing the Residuals vs Fitted graph above, there is huge amounts of fluctuations in the relationship between the residuals and the fitted values. 
+
+
+
+## 4. Discussion/Conclusions  <a id="section-1"></a>
+When comparing both time series, there are noticeable similarities but differences such as seasonality should not be ignored. It should be noted that both datasets are measured over different time periods (although having some overlap), and are measured in different units. They are also not correlated as the `CO2` data measures atmospheric CO2 concentrations over months and the `Global Emissions of Carbon Dioxide` measures CO2 emissions globally over years and so are independent from each other.  
+
+However, although they are different data sets, there is a possible causal relationship between them for some period of time. Atmospheric CO2 concentration is influenced by many factors and so global emissions of carbon dioxide can contribute or influence to the increase in the atmospheric CO2 concentrations over time. 
+
+Although the data sets are not the same, they can be related in a way that global emissions of carbon dioxide can impact the atmospheric CO2 concentrations, affecting the data of `CO2` over times where both data sets overlap in years as the `CO2` data was collected from 1959 to 1997 whereas the `Annual Global Emissions of Carbon Dioxide` data was collected from 1940 to 2023. 
+
+
+
+
+```{r, echo=FALSE}
+htmltools::img(src = knitr::image_uri("Emissions.png"), 
+               alt = 'logo', 
+               style = 'position:absolute; bottom:0 center:0; padding:10px; width:90%;')
+```
